@@ -1,0 +1,2 @@
+This repertory contents the output of the flux extraction routine.
+The files are in the FITS format, representing the spectral flux intensity (in ADU) vs Wavelength (in units).
