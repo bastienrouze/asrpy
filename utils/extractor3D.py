@@ -41,11 +41,15 @@ def SADatacube(data_dictionnary):
 	print 'Importing astropy...'
 	from astropy.io import fits
 	from astropy import units as u
-	from astropy import coordinates as coord
+	from astropy.coordinates import SkyCoord
+	
 	from astropy.wcs import WCS
 	from astropy.utils.data import get_pkg_data_filename
 	from astropy.modeling import models, fitting
 	from astropy.stats import sigma_clip
+	
+	
+	
 	
 	print 'Importing scipy...'
 	from scipy.interpolate import interp1d
@@ -71,7 +75,6 @@ def SADatacube(data_dictionnary):
 	range_decra = data_dictionnary['range_decra']
 	refline = data_dictionnary['refline']
 	line_name = data_dictionnary['line_name']
-	job = data_dictionnary['job']
 	print 'Starting SA extractor...'
 	print 'Opening fits...'
 	fits_main = fits.open(fits_path, mode='update')
@@ -89,7 +92,9 @@ def SADatacube(data_dictionnary):
 	
 	print 'Horizontal spectra'
 	print 'Getting data from header...'
-	
+	coord_radec_fk5 = SkyCoord(ra=fits_main[0].header['RA']*u.degree, dec=fits_main[0].header['DEC']*u.degree, frame='fk5')
+	coord_galactic = coord_radec_fk5.galactic
+	print coord_galactic
 	axis_data = {}
 	axis_data[1] = {}
 	axis_data[1]['ctype'] = fits_main[0].header['CTYPE1']
@@ -219,288 +224,223 @@ def SADatacube(data_dictionnary):
 	
 	
 	Flux = []
-	print 'Ready for job ', job
+	
 	#--------------------------------------SPECTROASTROMETRY------------
-	if job =='S':
-		
-		lightspeed=299792.458 # c
-		velocity = []
-		w0 = wavelength[0]
-		RVC_B = fits_main[0].header['HIERARCH ESO QC VRAD BARYCOR']  #Radial Velocity Correction Barycentric
-		RVC_H = fits_main[0].header['HIERARCH ESO QC VRAD HELICOR']  #Radial Velocity Correction Heliocentric
-		l = 353.4831*(math.pi/180)   # Galactic Longitude of Y*O Oph1
-		b = 15.6607*(math.pi/180)   # Galactic Lattitude of Y*O Oph1
-		RVC_lb = 9*math.cos(l)*math.cos(b)+12*math.sin(l)*math.cos(b)+7*math.sin(b)   #Radial Velocity Correction LSR
-		RVC = RVC_H + RVC_lb # Total correction
-		while w0 < wavelength[-1] :
-			velocity.append(((w0 - refline)/refline)*lightspeed+RVC)
-			w0 = w0 + axis_data[3]['cdelt'] 
-		
-		print 'Central wavelength = ', wavelength[central_wavelength-1], axis_data[3]['cunit']
-		print 'Reference wavelength = ', refline, axis_data[3]['cunit']
-		
-		print'Radial velocity correction (RVC) = ', RVC, ' km/s'
-		
-		declinaison = range(axis_data[1]['naxis'])
-		declinaison[axis_data[1]['crpix']-1]=axis_data[1]['crval'] 
-		i = (axis_data[1]['crpix']-1)-1
-		while i >= 0 :
-			declinaison[i]=declinaison[i+1]-axis_data[1]['cdelt'] 
-			i = i-1
-		i = (axis_data[1]['crpix']-1)+1
-		while i < axis_data[1]['naxis']:
-			declinaison[i]=declinaison[i-1]+axis_data[1]['cdelt'] 
-			i = i+1
-		
-		rightascension = range(axis_data[2]['naxis'])
-		rightascension[axis_data[2]['crpix']-1]=axis_data[2]['crval'] 
-		i = (axis_data[2]['crpix']-1)-1
-		while i >= 0 :
-			rightascension[i]=rightascension[i+1]-axis_data[2]['cdelt'] 
-			i = i-1
-		i = (axis_data[2]['crpix']-1)+1
-		while i < axis_data[2]['naxis']:
-			rightascension[i]=rightascension[i-1]+axis_data[2]['cdelt'] 
-			i = i+1
-		
-		
-		
-		
-		for z in z_array :
-			Zdata = []
-			for i in range(range_decra):
-				Zdata.append(image_data[z][ylow+i][xlow:xup])
-			g = fit_g(g_init,x,y,Zdata)
-			Flux.append(image_data[z][axis_data[2]['crpix']-1][axis_data[1]['crpix']-1])
-			X_centroid.append(g.x_mean.value)
-			Y_centroid.append(g.y_mean.value)
-		
-		#print len(X_centroid)
-		#print len(wavelength[zlow:zup])
-		
-		XTilt = np.poly1d(np.polyfit(z_array, X_centroid, 1))(z_array)
-		YTilt = np.poly1d(np.polyfit(z_array, Y_centroid, 1))(z_array)
-		
-		X_centroid2 , Y_centroid2 = [], []
-		
-		for i in range(len(X_centroid)):
-			X_centroid2.append(-1*(X_centroid[i] - XTilt[i])*axis_data[1]['cdelt']*3600*1000) # pixel to deg to arcsec  #(-1) is here just because of the strange way of reading data...
-			Y_centroid2.append(-1*(Y_centroid[i] - YTilt[i])*axis_data[2]['cdelt']*3600*1000)
-		
-		
-		Xhalflength = int(len(X_centroid2)/2)
-		Yhalflength = int(len(Y_centroid2)/2)
-		Noise_arrayX1 = X_centroid2[0:Xhalflength-15]
-		Noise_arrayY1 = Y_centroid2[0:Yhalflength-15]
-		Noise_arrayX1.extend(X_centroid2[Xhalflength+14:])
-		Noise_arrayY1.extend(Y_centroid2[Yhalflength+14:])
-		
-		Noise_meanX = sum(Noise_arrayX1)/float(len(Noise_arrayX1))
-		Noise_sigmaX = np.sqrt(sum([(x-Noise_meanX)**2 for x in Noise_arrayX1])/float(len([(x-Noise_meanX)**2 for x in Noise_arrayX1])))
-		
-		Noise_meanY = sum(Noise_arrayY1)/float(len(Noise_arrayY1))
-		Noise_sigmaY = np.sqrt(sum([(x-Noise_meanY)**2 for x in Noise_arrayY1])/float(len([(x-Noise_meanY)**2 for x in Noise_arrayY1])))
-		#print len(velocity[zlow:zup])
-		#print len(X_centroid2)
 	
-		
-		
-		
-		
-		SA_meanX = sum(X_centroid2)/float(len(X_centroid2))
-		SA_sigmaX = np.sqrt(sum([(x-SA_meanX)**2 for x in X_centroid2])/float(len([(x-SA_meanX)**2 for x in X_centroid2])))
-		
-		SA_meanY = sum(Y_centroid2)/float(len(Y_centroid2))
-		SA_sigmaY = np.sqrt(sum([(x-SA_meanY)**2 for x in Y_centroid2])/float(len([(x-SA_meanY)**2 for x in Y_centroid2])))
-		
-		
-		SA_sigmaR2 = np.sqrt((SA_sigmaX**2)+(SA_sigmaY**2))
-		SA_sigmaR = np.sqrt((Noise_sigmaX**2)+(Noise_sigmaY**2))
-		
-		countX = 0
-		countY = 0
-		countR = 0
-		for i in range(len(X_centroid2)):
-			#print X_centroid2[i]
-			if abs(X_centroid2[i]) <= Noise_sigmaX:
-				countX = countX+1
-			if abs(Y_centroid2[i]) <= Noise_sigmaY:
-				countY = countY+1
-			if (X_centroid2[i]**2)+(Y_centroid2[i]**2) <= SA_sigmaR**2:
-				countR  = countR +1
-				
-		resX = float(countX)/len(X_centroid2)
-		resY = float(countY)/len(Y_centroid2)
-		resR = float(countR)/len(Y_centroid2)
-		print 'Ratio (X<SigmaX , Y<SigmaY , R^2<SigmaR^2) ', resX, resY, resR
-			
-		#print 'Mean (X,Y)    ',SA_meanX, SA_meanY
-		#print 'Sigma (X,Y)    ',SA_sigmaX, SA_sigmaY
-		print 'Sigma Noise (X,Y) ',Noise_sigmaX,Noise_sigmaY
-		print 'Sigma (Noise) (R)    ',SA_sigmaR
-		
-		
-		
-		
-		cm = plt.cm.get_cmap('RdYlBu')
-		plt.ion()
-		#-------------------------------------------------------------------
-		
-		plt.figure()
-		plt.imshow(image_data[central_wavelength-1],aspect='auto',origin='lower',interpolation='none')
-		#plt.contourf(image_data[central_wavelength-1],origin='lower',extent=[-32, 48, -33, 41])
-		#plt.contourf(image_data[central_wavelength-1],origin='lower',extent=[declinaison[0]-axis_data[1]['crval'], declinaison[-1]-axis_data[1]['crval'], rightascension[0]-axis_data[2]['crval'], rightascension[-1]-axis_data[2]['crval']])
-		plt.colorbar()
-		#-------------------------------------------------------------------
-		
-		main_fig, (fig1, fig2, fig3) = plt.subplots(nrows = 3, ncols=1)
-		main_fig.subplots_adjust(hspace=1.0)
-		plt.suptitle('Spectro-astrometry of '+line_name)
-		
-		fig3.plot(wavelength[zlow:zup],Flux,'k',label='Flux')
-		fig3.set_xlabel('Wavelength ($\mu m$)')
-		fig3.set_ylabel('Flux (Arbitrary Units)')
-		
-		fig1.plot(wavelength[zlow:zup],X_centroid,'b-',label='DEC')
-		fig1.plot(wavelength[zlow:zup],XTilt,'k--',label='DEC-Continuum')
-		fig1.set_xlabel('Wavelength ($\mu m$)')
-		fig1.set_ylabel('DEC centroids (pixel)')
-		fig1.legend(loc=2)
-		
-		fig2.plot(wavelength[zlow:zup],Y_centroid,'g-',label='RA')
-		fig2.plot(wavelength[zlow:zup],YTilt,'k--',label='RA-Continuum')
-		fig2.set_xlabel('Wavelength ($\mu m$)')
-		fig2.set_ylabel('RA centroids (pixel)')
-		fig2.legend(loc=2)
-		
-		#-------------------------------------------------------------------
-		
-		main_fig2, (fig21, fig23) = plt.subplots(nrows = 2, ncols=1)
-		main_fig2.subplots_adjust(hspace=0.5)
-		plt.suptitle('Spectro-astrometry of '+line_name)
-		
-		fig21.plot(velocity[zlow:zup],Flux,'k',label='Flux')
-		fig21.set_xlabel('LSR Velocity (km/s)')
-		fig21.set_ylabel('Flux (Arbitrary Units)')
-		
-		fig23.plot(velocity[zlow:zup],X_centroid2,'b-',label='DEC ')
-		fig23.plot(velocity[zlow:zup],Y_centroid2,'g-',label='RA')
-		fig23.set_xlabel('LSR Velocity (km/s)')
-		fig23.set_ylabel('Offset (mas)')
-		fig23.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-	           ncol=2, borderaxespad=0.)
-		
-		#fig21.plot(velocity[zlow:zup],X_centroid2,'b-',label='DEC')
-		#fig21.set_xlabel('LSR Velocity (km/s)')
-		#fig21.set_ylabel('DEC centroids (mas)')
-		#fig21.legend(loc=2)
-		
-		#fig22.plot(velocity[zlow:zup],Y_centroid2,'g-',label='RA')
-		
-		#fig22.set_xlabel('LSR Velocity (km/s)')
-		#fig22.set_ylabel('RA centroids (mas)')
-		#fig22.legend(loc=2)
-		
-		#-------------------------------------------------------------------
-			
-		plt.figure()	
-		
-		plt.title('Spectro-astrometric map of '+line_name)
-		plt.scatter(Y_centroid2,X_centroid2, c=velocity[zlow:zup])
-			
-		plt.gca().invert_xaxis()
-		
-		xarrow = input('Please enter x arrow East-North')
-		yarrow = input('Please enter y arrow East-North')
-		
-		darrow = input('Please enter dx (dy) for arrow East-North')
-		
-		plt.axis('equal')
-		plt.arrow(xarrow,yarrow,darrow,0,width=0.0001,head_width=0.1)
-		plt.text(xarrow+darrow+0.6,yarrow-0.1,'E',fontdict=None, withdash=False)
-		plt.arrow(xarrow,yarrow,0,darrow,width=0.0001,head_width=0.1)
-		plt.text(xarrow+0.1,yarrow+darrow+0.5,'N',fontdict=None, withdash=False)
-		plt.colorbar(label='LSR Velocity (km/s)')
-		plt.ylabel('DEC (mas)')
-		plt.xlabel('RA (mas)')
-		fig = plt.gcf()
-		ax = fig.gca()
-		circ = plt.Circle((0, 0), radius=SA_sigmaR, color='g',fill= False)
-		ax.add_artist(circ)
-		print 'job ', job,' done'
+	lightspeed=299792.458 # c
+	velocity = []
+	w0 = wavelength[0]
+	RVC_B = fits_main[0].header['HIERARCH ESO QC VRAD BARYCOR']  #Radial Velocity Correction Barycentric
+	RVC_H = fits_main[0].header['HIERARCH ESO QC VRAD HELICOR']  #Radial Velocity Correction Heliocentric
+	l = coord_galactic.l.radian#*(math.pi/180)   # Galactic Longitude of Y*O Oph1
+	b = coord_galactic.b.radian#*(math.pi/180)   # Galactic Lattitude of Y*O Oph1
+	RVC_lb = 9*math.cos(l)*math.cos(b)+12*math.sin(l)*math.cos(b)+7*math.sin(b)   #Radial Velocity Correction LSR
+	RVC = RVC_H + RVC_lb # Total correction
+	while w0 < wavelength[-1] :
+		velocity.append(((w0 - refline)/refline)*lightspeed+RVC)
+		w0 = w0 + axis_data[3]['cdelt'] 
+	
+	print 'Central wavelength = ', wavelength[central_wavelength-1], axis_data[3]['cunit']
+	print 'Reference wavelength = ', refline, axis_data[3]['cunit']
+	
+	print'Radial velocity correction (RVC) = ', RVC, ' km/s'
+	
+	declinaison = range(axis_data[1]['naxis'])
+	declinaison[axis_data[1]['crpix']-1]=axis_data[1]['crval'] 
+	i = (axis_data[1]['crpix']-1)-1
+	while i >= 0 :
+		declinaison[i]=declinaison[i+1]-axis_data[1]['cdelt'] 
+		i = i-1
+	i = (axis_data[1]['crpix']-1)+1
+	while i < axis_data[1]['naxis']:
+		declinaison[i]=declinaison[i-1]+axis_data[1]['cdelt'] 
+		i = i+1
+	
+	rightascension = range(axis_data[2]['naxis'])
+	rightascension[axis_data[2]['crpix']-1]=axis_data[2]['crval'] 
+	i = (axis_data[2]['crpix']-1)-1
+	while i >= 0 :
+		rightascension[i]=rightascension[i+1]-axis_data[2]['cdelt'] 
+		i = i-1
+	i = (axis_data[2]['crpix']-1)+1
+	while i < axis_data[2]['naxis']:
+		rightascension[i]=rightascension[i-1]+axis_data[2]['cdelt'] 
+		i = i+1
 	
 	
-	#--------------------------------------FLUX EXTRACTION--------------	
-	if job=='F':
-		image_data = fits_main[0].data
-		Flux_ref = []
-		
-		for z in z_array :
-			arrayflux = []
-			totalflux = []
-			for i in range(range_decra):
-				arrayflux.extend(image_data[z][(axis_data[2]['crpix']-1-int(range_decra/2)):(axis_data[2]['crpix']-1+int(range_decra/2))][i][(axis_data[1]['crpix']-1-int(range_decra/2)):(axis_data[1]['crpix']-1+int(range_decra/2))])
-				totalflux.extend(image_data[z][5:50][i][5:50])
-			#print arrayflux
-			Flux_ref.append(np.sum(totalflux))
-			Flux.append(np.sum(arrayflux))
-			#input('test')
-			#print Flux
+	
+	
+	for z in z_array :
+		Zdata = []
+		for i in range(range_decra):
+			Zdata.append(image_data[z][ylow+i][xlow:xup])
+		g = fit_g(g_init,x,y,Zdata)
+		Flux.append(image_data[z][axis_data[2]['crpix']-1][axis_data[1]['crpix']-1])
+		X_centroid.append(g.x_mean.value)
+		Y_centroid.append(g.y_mean.value)
+	
+	#print len(X_centroid)
+	#print len(wavelength[zlow:zup])
+	
+	XTilt = np.poly1d(np.polyfit(z_array, X_centroid, 1))(z_array)
+	YTilt = np.poly1d(np.polyfit(z_array, Y_centroid, 1))(z_array)
+	
+	X_centroid2 , Y_centroid2 = [], []
+	
+	for i in range(len(X_centroid)):
+		X_centroid2.append(-1*(X_centroid[i] - XTilt[i])*axis_data[1]['cdelt']*3600*1000) # pixel to deg to arcsec  #(-1) is here just because of the strange way of reading data...
+		Y_centroid2.append(-1*(Y_centroid[i] - YTilt[i])*axis_data[2]['cdelt']*3600*1000)
+	
+	
+	Xhalflength = int(len(X_centroid2)/2)
+	Yhalflength = int(len(Y_centroid2)/2)
+	Noise_arrayX1 = X_centroid2[0:Xhalflength-15]
+	Noise_arrayY1 = Y_centroid2[0:Yhalflength-15]
+	Noise_arrayX1.extend(X_centroid2[Xhalflength+14:])
+	Noise_arrayY1.extend(Y_centroid2[Yhalflength+14:])
+	
+	Noise_meanX = sum(Noise_arrayX1)/float(len(Noise_arrayX1))
+	Noise_sigmaX = np.sqrt(sum([(x-Noise_meanX)**2 for x in Noise_arrayX1])/float(len([(x-Noise_meanX)**2 for x in Noise_arrayX1])))
+	
+	Noise_meanY = sum(Noise_arrayY1)/float(len(Noise_arrayY1))
+	Noise_sigmaY = np.sqrt(sum([(x-Noise_meanY)**2 for x in Noise_arrayY1])/float(len([(x-Noise_meanY)**2 for x in Noise_arrayY1])))
+	#print len(velocity[zlow:zup])
+	#print len(X_centroid2)
+
+	
+	
+	
+	
+	SA_meanX = sum(X_centroid2)/float(len(X_centroid2))
+	SA_sigmaX = np.sqrt(sum([(x-SA_meanX)**2 for x in X_centroid2])/float(len([(x-SA_meanX)**2 for x in X_centroid2])))
+	
+	SA_meanY = sum(Y_centroid2)/float(len(Y_centroid2))
+	SA_sigmaY = np.sqrt(sum([(x-SA_meanY)**2 for x in Y_centroid2])/float(len([(x-SA_meanY)**2 for x in Y_centroid2])))
+	
+	
+	SA_sigmaR2 = np.sqrt((SA_sigmaX**2)+(SA_sigmaY**2))
+	SA_sigmaR = np.sqrt((Noise_sigmaX**2)+(Noise_sigmaY**2))
+	
+	countX = 0
+	countY = 0
+	countR = 0
+	for i in range(len(X_centroid2)):
+		#print X_centroid2[i]
+		if abs(X_centroid2[i]) <= Noise_sigmaX:
+			countX = countX+1
+		if abs(Y_centroid2[i]) <= Noise_sigmaY:
+			countY = countY+1
+		if (X_centroid2[i]**2)+(Y_centroid2[i]**2) <= SA_sigmaR**2:
+			countR  = countR +1
 			
-		for f in Flux_ref:
-			if math.isnan(f):
-				# NaN values are replaced by 0 value
-				# Feel free to change this !
-				print 'NaN found'
-				f=0
+	resX = float(countX)/len(X_centroid2)
+	resY = float(countY)/len(Y_centroid2)
+	resR = float(countR)/len(Y_centroid2)
+	print 'Ratio (X<SigmaX , Y<SigmaY , R^2<SigmaR^2) ', resX, resY, resR
 		
+	#print 'Mean (X,Y)    ',SA_meanX, SA_meanY
+	#print 'Sigma (X,Y)    ',SA_sigmaX, SA_sigmaY
+	print 'Sigma Noise (X,Y) ',Noise_sigmaX,Noise_sigmaY
+	print 'Sigma (Noise) (R)    ',SA_sigmaR
+	
+	
+	
+	
+	cm = plt.cm.get_cmap('RdYlBu')
+	plt.ion()
+	#-------------------------------------------------------------------
+	
+	plt.figure()
+	plt.imshow(image_data[central_wavelength-1],aspect='auto',origin='lower',interpolation='none')
+	#plt.contourf(image_data[central_wavelength-1],origin='lower',extent=[-32, 48, -33, 41])
+	#plt.contourf(image_data[central_wavelength-1],origin='lower',extent=[declinaison[0]-axis_data[1]['crval'], declinaison[-1]-axis_data[1]['crval'], rightascension[0]-axis_data[2]['crval'], rightascension[-1]-axis_data[2]['crval']])
+	plt.colorbar()
+	#-------------------------------------------------------------------
+	
+	x_axis = wavelength
+	x_axis_label = 'Wavelength ('+axis_data[wave_axis]['cunit']+')'
+	if Wave_or_Velo == 'V':
+		x_axis = velocity
+		x_axis_label = 'LSR Velocity (km/s)'
+	
+	main_fig, (fig1, fig2, fig3) = plt.subplots(nrows = 3, ncols=1)
+	main_fig.subplots_adjust(hspace=1.0)
+	plt.suptitle('Spectro-astrometry of '+line_name)
+	
+	fig3.plot(x_axis[zlow:zup],Flux,'k',label='Flux')
+	fig3.set_xlabel(x_axis_label)
+	fig3.set_ylabel('Flux (Arbitrary Units)')
+	
+	fig1.plot(x_axis[zlow:zup],X_centroid,'b-',label='DEC')
+	fig1.plot(wavelength[zlow:zup],XTilt,'k--',label='DEC-Continuum')
+	fig1.set_xlabel(x_axis_label)
+	fig1.set_ylabel('DEC centroids (pixel)')
+	fig1.legend(loc=2)
+	
+	fig2.plot(x_axis[zlow:zup],Y_centroid,'g-',label='RA')
+	fig2.plot(x_axis[zlow:zup],YTilt,'k--',label='RA-Continuum')
+	fig2.set_xlabel(x_axis_label)
+	fig2.set_ylabel('RA centroids (pixel)')
+	fig2.legend(loc=2)
+	
+	#-------------------------------------------------------------------
+	
+	main_fig2, (fig21, fig23) = plt.subplots(nrows = 2, ncols=1)
+	main_fig2.subplots_adjust(hspace=0.5)
+	plt.suptitle('Spectro-astrometry of '+line_name)
+	
+	fig21.plot(x_axis[zlow:zup],Flux,'k',label='Flux')
+	fig21.set_xlabel(x_axis_label)
+	fig21.set_ylabel('Flux (Arbitrary Units)')
+	
+	fig23.plot(x_axis[zlow:zup],X_centroid2,'b-',label='DEC ')
+	fig23.plot(x_axis[zlow:zup],Y_centroid2,'g-',label='RA')
+	fig23.set_xlabel(x_axis_label)
+	fig23.set_ylabel('Offset (mas)')
+	fig23.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, borderaxespad=0.)
+	
+	#fig21.plot(velocity[zlow:zup],X_centroid2,'b-',label='DEC')
+	#fig21.set_xlabel('LSR Velocity (km/s)')
+	#fig21.set_ylabel('DEC centroids (mas)')
+	#fig21.legend(loc=2)
+	
+	#fig22.plot(velocity[zlow:zup],Y_centroid2,'g-',label='RA')
+	
+	#fig22.set_xlabel('LSR Velocity (km/s)')
+	#fig22.set_ylabel('RA centroids (mas)')
+	#fig22.legend(loc=2)
+	
+	#-------------------------------------------------------------------
 		
+	plt.figure()	
+	
+	plt.title('Spectro-astrometric map of '+line_name)
+	plt.scatter(Y_centroid2,X_centroid2, c=x_axis[zlow:zup])
 		
-				
+	plt.gca().invert_xaxis()
+	
+	xarrow = input('Please enter x arrow East-North')
+	yarrow = input('Please enter y arrow East-North')
+	
+	darrow = input('Please enter dx (dy) for arrow East-North')
+	
+	plt.axis('equal')
+	plt.arrow(xarrow,yarrow,darrow,0,width=0.0001,head_width=0.1)
+	plt.text(xarrow+darrow+0.6,yarrow-0.1,'E',fontdict=None, withdash=False)
+	plt.arrow(xarrow,yarrow,0,darrow,width=0.0001,head_width=0.1)
+	plt.text(xarrow+0.1,yarrow+darrow+0.5,'N',fontdict=None, withdash=False)
+	plt.colorbar(label=x_axis_label)
+	plt.ylabel('DEC (mas)')
+	plt.xlabel('RA (mas)')
+	fig = plt.gcf()
+	ax = fig.gca()
+	circ = plt.Circle((0, 0), radius=SA_sigmaR, color='g',fill= False)
+	ax.add_artist(circ)
 		
-		plt.ion()
-		
-		
-		main_fig, (fig1, fig2) = plt.subplots(nrows = 2, ncols=1)
-		main_fig.subplots_adjust(hspace=1.0)
-		plt.suptitle('Flux calibration')
-		
-		fig1.plot(wavelength[zlow:zup],Flux,'k',label='Flux')
-		fig1.set_xlabel('Wavelength ($\mu m$)')
-		fig1.set_ylabel('Flux (Arbitrary Units)')
-		
-		fig2.plot(wavelength[zlow:zup],Flux_ref,'k',label='Flux')
-		fig2.set_xlabel('Wavelength ($\mu m$)')
-		fig2.set_ylabel('Total (Arbitrary Units)')
-		
-		
-		#fits_main[0].data = Flux
-		#fits_main[0].header['NAXIS']=1
-		#fits_main[0].header['NAXIS1']=axis_data[3]['naxis'] 
-		#fits_main[0].header['CRPIX1']=axis_data[3]['crpix']
-		#fits_main[0].header['CRVAL1']=axis_data[3]['crval']
-		#fits_main[0].header['CDELT1']=axis_data[3]['cdelt']
-		#fits_main[0].header['CUNIT1']=axis_data[3]['cunit']
-		#fits_main[0].header['CD1_1']=axis_data[3]['cdelt']
-		hdu = fits.PrimaryHDU()
-		hdu.data = Flux
-		
-		hdu.header['BITPIX']=-32
-		hdu.header['NAXIS']=1
-		hdu.header['NAXIS1']=len(Flux)
-		
-		hdu.header['CRPIX1']=1
-		hdu.header['CRVAL1']=wavelength[zlow]
-		hdu.header['CDELT1']=axis_data[3]['cdelt']
-		hdu.header['CD1_1']=axis_data[3]['cdelt']
-		hdu.header['CUNIT1']=axis_data[3]['cunit']
-		hdu.header['DISPAXIS']=1
-		hdu.header['AIRMASS']=fits_main[0].header['HIERARCH ESO TEL AIRM START']
-		hdu.header['EXPTIME']=float(fits_main[0].header['HIERARCH ESO DET NDIT'])*float(fits_main[0].header['HIERARCH ESO DET DIT'])
-		#
-		hdu.header['OBSERVED OBJECT NAME']=fits_main[0].header['HIERARCH ESO OBS TARG NAME']
-		hdu.writeto('./products/flux_extraction/output.fits',output_verify='exception', overwrite=True, checksum=True)
-		
+	
+	
+			
 		
 		
 		
