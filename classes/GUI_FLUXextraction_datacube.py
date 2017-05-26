@@ -1,6 +1,24 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+#  Copyright 2017 Bastien Rouzé
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#  MA 02110-1301, USA.
+#  
+#  
 
 # All import------------------------------------------------------------
 from Tkinter import *
@@ -101,17 +119,6 @@ class GUI_FLUXextraction_datacube(Frame):
 				
 		# --------------------------------------------------------------
 		
-		self.refframe = LabelFrame(self, text="Set the reference line [check header for unit]", padx=20, pady=10)
-		self.refframe.pack(fill=X)
-		
-		self.wref = Frame(self.refframe)
-		self.wref.pack(fill=X)
-		self.wreflabel = Label(self.wref, text="Value : ")
-		self.wreflabel.pack(side=LEFT)
-		self.entry_Wref = Entry(self.wref)
-		self.entry_Wref.pack(side=RIGHT)
-		
-		
 		# Set the pixel and lambda ROIs --------------------------------
 		# first is for spectral direction 
 		# ...2 is for spatial one.
@@ -121,7 +128,7 @@ class GUI_FLUXextraction_datacube(Frame):
 		
 		self.winterest = Frame(self.roiframe)
 		self.winterest.pack(fill=X)
-		self.winlabel = Label(self.winterest, text="Wavelength of interest :  ")
+		self.winlabel = Label(self.winterest, text="Wavelength of interest slice:  ")
 		self.winlabel.pack(side=LEFT)
 		self.entry_W = Entry(self.winterest)
 		self.entry_W.pack(side=RIGHT)
@@ -131,7 +138,7 @@ class GUI_FLUXextraction_datacube(Frame):
 		self.wlabel = Label(self.wroi, text="Wavelength range length :  ")
 		self.wlabel.pack(side=LEFT)
 		self.entry_roiW = Entry(self.wroi)
-		self.entry_roiW.pack(side=LEFT)
+		self.entry_roiW.pack(side=RIGHT)
 				
 		self.decraroi = Frame(self.roiframe)
 		self.decraroi.pack(fill=X)
@@ -225,12 +232,10 @@ class GUI_FLUXextraction_datacube(Frame):
 			print 'Loading dictionnary...'
 			self.data_dictionnary ={}
 			self.data_dictionnary['fits_path']=self.fits_path
-			self.data_dictionnary['Wave_or_Velo']=self.Wave_or_Velo
 			self.data_dictionnary['central_wavelength']=int(self.entry_W.get())
 			self.data_dictionnary['range_wavelength']=int(self.entry_roiW.get())
 			self.data_dictionnary['range_decra']=int(self.entry_decra_roi.get())
-			self.data_dictionnary['refline']=float(self.entry_Wref.get())
-			self.data_dictionnary['line_name']=self.entry_name.get()
-			self.data_dictionnary['job']= 'Flux Extraction'
+			self.data_dictionnary['name']=self.entry_name.get()
 			print 'done'
-			SADatacube(self.data_dictionnary)
+			from utils.flux3D import FLUXextraction_3D
+			FLUXextraction_3D(self.data_dictionnary)

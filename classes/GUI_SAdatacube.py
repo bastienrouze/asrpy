@@ -23,11 +23,6 @@ from functools import partial
 import re
 import matplotlib
 # ----------------------------------------------------------------------
-from utils.extractor import SAextractor
-from utils.analysis import SAanalysis
-from utils.extractor3D import SADatacube
-from utils.flux_calibration import flux_calibration
-
 # ----------------------------------------------------------------------
 
 class GUI_SAdatacube(Frame):
@@ -102,19 +97,7 @@ class GUI_SAdatacube(Frame):
 		self.entry_name = Entry(self.displayframe)
 		self.entry_name.pack(side=RIGHT)
 		
-		# Definition of the Job choice --------------------------	
-		self.jobframe = LabelFrame(self, text="Job", padx=20, pady=10)
-		self.jobframe.pack(fill=X)
-		
-		self.radiojobframe = Frame(self.jobframe)
-		self.radiojobframe.pack(fill=X)
-		
-		self.jobchoice_label = Label(self.radiojobframe, text="Job :")
-		self.jobchoice_label.pack(side=LEFT)
-		self.jobchoice_button = StringVar()
-		Radiobutton(self.radiojobframe,text="Flux Extraction",value = "F",variable = self.jobchoice_button).pack(side=RIGHT)
-		Radiobutton(self.radiojobframe,text="Spectroastrometry",value = "S",variable = self.jobchoice_button).pack(side=RIGHT)
-			
+
 				
 		# --------------------------------------------------------------
 		
@@ -239,13 +222,7 @@ class GUI_SAdatacube(Frame):
 		else:
 			self.Wave_or_Velo = self.Wave_or_Velo_button.get()
 			
-		if self.jobchoice_button.get()=='':
-			showwarning('Warning','Default Job is Spectro-astrometry.')
-			self.jobchoice = 'S'
-			self.jobchoice_button = StringVar()
-		else:
-			self.jobchoice = self.jobchoice_button.get()
-			print self.jobchoice
+		
 		# Future version will include other parameters.	
 		# Last parameter to check is the ROI
 		
@@ -266,6 +243,6 @@ class GUI_SAdatacube(Frame):
 			self.data_dictionnary['range_decra']=int(self.entry_decra_roi.get())
 			self.data_dictionnary['refline']=float(self.entry_Wref.get())
 			self.data_dictionnary['line_name']=self.entry_name.get()
-			self.data_dictionnary['job']=self.jobchoice
 			print 'done'
+			from utils.extractor3D import SADatacube
 			SADatacube(self.data_dictionnary)
