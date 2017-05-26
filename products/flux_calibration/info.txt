@@ -1,0 +1,2 @@
+This repertory contents the output of the flux calibration routine.
+The files are in the FITS format, representing the spectral flux intensity (in erg/cm2/s/units) vs Wavelength (in units).
