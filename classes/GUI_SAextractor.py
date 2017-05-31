@@ -33,7 +33,7 @@ from utils.flux_calibration import flux_calibration
 # CLASS DECLARATION
 
 class GUI_SAextractor(Frame):
-	''' Class for 2D spectro-astrometry (applied to a 2D spectra):
+	''' Class for 2D spectro-astrometry (applied to a 2D spectrum):
 	An instance of this class opens a GUI to help the user to 
 	perform a spectro-astrometry study with differents parameters.
 	Spectro-astrometry : for each wavelength in the array the centroid 
