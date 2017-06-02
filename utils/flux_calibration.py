@@ -105,6 +105,10 @@ def flux_calibration(fits_path_standard,fits_path_object):
 	
 	# magnitude in JHK
 	
+	#mJ = 8.487
+	#mH = 8.494
+	#mK = 8.459
+	
 	mJ = 7.203
 	mH = 7.249
 	mK = 7.200
@@ -159,11 +163,11 @@ def flux_calibration(fits_path_standard,fits_path_object):
 		w_range.append(i)
 		i=i+0.01
 	for w in w_range:
-		f_test.append((1e6)*powconstant*(w**p[0]))
+		f_test.append((1e7)*powconstant*(w**p[0]))
 	
 	
 	for w in wavelengths:
-		blackbody_fit.append((1e6)*powconstant*(w**p[0]))
+		blackbody_fit.append((1e7)*powconstant*(w**p[0]))
 	
 		
 	

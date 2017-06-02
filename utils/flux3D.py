@@ -70,7 +70,7 @@ def FLUXextraction_3D(data_dictionnary):
 	central_wavelength = data_dictionnary['central_wavelength']
 	range_wavelength = data_dictionnary['range_wavelength']
 	range_decra = data_dictionnary['range_decra']
-	line_name = data_dictionnary['name']
+	name = data_dictionnary['name']
 		
 	print 'Opening fits...'
 	fits_main = fits.open(fits_path, mode='update')
@@ -197,7 +197,7 @@ def FLUXextraction_3D(data_dictionnary):
 	hdu.header['EXPTIME']=float(fits_main[0].header['HIERARCH ESO DET NDIT'])*float(fits_main[0].header['HIERARCH ESO DET DIT'])
 	#
 	hdu.header['OBSERVED OBJECT NAME']=fits_main[0].header['HIERARCH ESO OBS TARG NAME']
-	hdu.writeto('./products/flux_extraction/output.fits',output_verify='exception', overwrite=True, checksum=True)
+	hdu.writeto('./products/flux_extraction/output'+name+'.fits',output_verify='exception', overwrite=True, checksum=True)
 		
 		
 		
